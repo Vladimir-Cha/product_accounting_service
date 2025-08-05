@@ -10,33 +10,33 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type ProductHandler struct {
-	store *postgres.ProductStore
+type CategoryHandler struct {
+	store *postgres.CategoryStore
 }
 
-func NewProductHandler(store *postgres.ProductStore) *ProductHandler {
-	return &ProductHandler{store: store}
+func NewCategoryHandler(store *postgres.CategoryStore) *CategoryHandler {
+	return &CategoryHandler{store: store}
 }
 
 // хэндлер для создания записи в БД
-func (h *ProductHandler) CreateProduct(c echo.Context) error {
-	var p entities.Product
+func (h *CategoryHandler) CreateCategory(c echo.Context) error {
+	var p entities.Category
 	if err := c.Bind(&p); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{
 			"error": "Invalid request body",
 		})
 	}
 
-	if err := h.store.Create(c.Request().Context(), &p); err != nil {
+	if err := h.store.CreateCat(c.Request().Context(), &p); err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to create product",
+			"error": "Failed to create category",
 		})
 	}
 	return c.JSON(http.StatusCreated, p)
 }
 
 // хэндлер для получения записи по id
-func (h *ProductHandler) GetProduct(c echo.Context) error {
+func (h *CategoryHandler) GetCategory(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{
@@ -44,18 +44,18 @@ func (h *ProductHandler) GetProduct(c echo.Context) error {
 		})
 	}
 
-	product, err := h.store.Read(c.Request().Context(), id)
+	category, err := h.store.ReadCat(c.Request().Context(), id)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, echo.Map{
-			"error": "Product not found",
+			"error": "Category not found",
 		})
 	}
 
-	return c.JSON(http.StatusOK, product)
+	return c.JSON(http.StatusOK, category)
 }
 
 // хэндлер для обновления записи по id
-func (h *ProductHandler) UpdateProduct(c echo.Context) error {
+func (h *CategoryHandler) UpdateCategory(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{
@@ -63,7 +63,7 @@ func (h *ProductHandler) UpdateProduct(c echo.Context) error {
 		})
 	}
 
-	var input entities.Product
+	var input entities.Category
 
 	if err := c.Bind(&input); err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{
@@ -86,17 +86,17 @@ func (h *ProductHandler) UpdateProduct(c echo.Context) error {
 		})
 	}
 
-	err = h.store.Update(c.Request().Context(), &input)
+	err = h.store.UpdateCat(c.Request().Context(), &input)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to update product",
+			"error": "Failed to update category",
 		})
 	}
 	return c.JSON(http.StatusOK, input)
 }
 
 // хэндлер для удаления записи по id
-func (h *ProductHandler) DeleteProduct(c echo.Context) error {
+func (h *CategoryHandler) DeleteCategory(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{
@@ -104,20 +104,20 @@ func (h *ProductHandler) DeleteProduct(c echo.Context) error {
 		})
 	}
 
-	deletedProduct, err := h.store.Delete(c.Request().Context(), id)
+	deletedCategory, err := h.store.DeleteCat(c.Request().Context(), id)
 	if err != nil {
-		log.Printf("Delete failed for product %d: %v", id, err)
+		log.Printf("Delete failed for category %d: %v", id, err)
 		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to delete product",
+			"error": "Failed to delete category",
 		})
 	}
 
-	if deletedProduct == nil {
+	if deletedCategory == nil {
 		return c.JSON(http.StatusNotFound, echo.Map{
-			"error": "Product not found",
+			"error": "Category not found",
 		})
 	}
 
-	log.Printf("Product deleted: ID=%d, Name=%s, Price=%v", deletedProduct.ID, deletedProduct.Name, deletedProduct.Price)
-	return c.JSON(http.StatusOK, deletedProduct)
+	log.Printf("Product deleted: ID=%d, Name=%s, Price=%v", deletedCategory.ID, deletedCategory.Name)
+	return c.JSON(http.StatusOK, deletedCategory)
 }
