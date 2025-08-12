@@ -1,8 +1,9 @@
-package api
+package postgres
 
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -12,7 +13,11 @@ import (
 func GooseMigrationsWithPool(ctx context.Context, pool *pgxpool.Pool) error {
 	// преобразование pgxpool.Pool в *sql.DB
 	db := stdlib.OpenDBFromPool(pool)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("failed to close database: %v", err)
+		}
+	}()
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("failed to set dialect: %w", err)

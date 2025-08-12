@@ -4,64 +4,51 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
-	"time"
+	"strconv"
 
 	"github.com/Vladimir-Cha/product_accounting_service/internal/api"
+	"github.com/Vladimir-Cha/product_accounting_service/internal/config"
+	"github.com/Vladimir-Cha/product_accounting_service/internal/database"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/postgres"
-	"github.com/go-playground/validator"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
+	"github.com/Vladimir-Cha/product_accounting_service/internal/validator"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
-type customValidator struct {
-	validator *validator.Validate
-}
-
-func (v *customValidator) Validate(i interface{}) error {
-	return v.validator.Struct(i)
-}
-
 func main() {
-	//читаем .env
-	if err := godotenv.Load(); err != nil {
-		log.Printf("No .env file found: %v", err)
-	}
-	// Инициализация pgxpool
-	config, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
+	cfg := config.Load()
+
+	repo, err := database.New(context.Background(), config.DBConfig{
+		DBUrl:      cfg.DBUrl,
+		DBMaxConns: cfg.DBMaxConns,
+		DBMinConns: cfg.DBMinConns,
+		DBConnLife: cfg.DBConnLife,
+	})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	defer repo.Close()
+
+	if err := repo.Ping(context.Background()); err != nil {
+		log.Fatalf("Failed to connect database: %v", err)
 	}
 
-	config.MaxConns = 10
-	config.MinConns = 2
-	config.MaxConnLifetime = time.Hour
-
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer pool.Close()
-
-	if err := pool.Ping(context.Background()); err != nil {
-		log.Fatal(err)
+	// опциональные миграции
+	runMigrations := true
+	if runMigrations {
+		if err := postgres.GooseMigrationsWithPool(context.Background(), repo.Pool()); err != nil {
+			log.Fatalf("Migration failed: %v", err)
+		}
+		log.Println("Migrations applied successfully")
 	}
 
-	if err := api.GooseMigrationsWithPool(context.Background(), pool); err != nil {
-		log.Fatalf("Migration failed: %v", err)
-	}
-
-	log.Println("Migrations applied successfully")
-
-	productStore := postgres.NewProductStore(pool)
+	productStore := postgres.NewProductStore(repo.Pool())
 	productHandler := api.NewProductHandler(productStore)
-	categoryStore := postgres.NewCategoryStore(pool)
+	categoryStore := postgres.NewCategoryStore(repo.Pool())
 	categoryHandler := api.NewCategoryHandler(categoryStore)
 
 	e := echo.New()
-	e.Validator = &customValidator{validator: validator.New()}
+	e.Validator = validator.New()
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
@@ -74,9 +61,9 @@ func main() {
 	e.PUT("/categories/:id", categoryHandler.UpdateCategory)
 	e.DELETE("/categories/:id", categoryHandler.DeleteCategory)
 
-	// Запуск сервера
-	if err := e.Start(":8080"); err != http.ErrServerClosed {
-		log.Fatal(err)
+	// запуск сервера
+	addr := ":" + strconv.Itoa(cfg.ServerPort)
+	if err := e.Start(addr); err != http.ErrServerClosed {
+		log.Fatalf("Starting server error: %v", err)
 	}
-
 }

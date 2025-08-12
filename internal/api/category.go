@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/Vladimir-Cha/product_accounting_service/internal/entities"
+	"github.com/Vladimir-Cha/product_accounting_service/internal/errors"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/postgres"
 	"github.com/labstack/echo/v4"
 )
@@ -22,15 +23,13 @@ func NewCategoryHandler(store *postgres.CategoryStore) *CategoryHandler {
 func (h *CategoryHandler) CreateCategory(c echo.Context) error {
 	var p entities.Category
 	if err := c.Bind(&p); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid request body",
-		})
+		log.Printf("Invalid request body for category")
+		return c.JSON(errors.ErrBadRequest.Code, errors.ErrBadRequest.WithMap())
 	}
 
 	if err := h.store.CreateCat(c.Request().Context(), &p); err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to create category",
-		})
+		log.Printf("Failed to create category")
+		return c.JSON(errors.ErrDatabase.Code, errors.ErrBadRequest.WithMap())
 	}
 	return c.JSON(http.StatusCreated, p)
 }
@@ -39,16 +38,17 @@ func (h *CategoryHandler) CreateCategory(c echo.Context) error {
 func (h *CategoryHandler) GetCategory(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid ID format",
-		})
+		log.Printf("Invalid ID format for category")
+		return c.JSON(errors.ErrBadRequest.Code, errors.ErrBadRequest.WithDetails(map[string]any{
+			"field": "id",
+			"value": c.Param("id"),
+		}).WithMap())
 	}
 
 	category, err := h.store.ReadCat(c.Request().Context(), id)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, echo.Map{
-			"error": "Category not found",
-		})
+		log.Printf("Category not found: %v", err)
+		return c.JSON(errors.ErrDatabase.Code, errors.ErrDatabase.WithError(err).WithMap())
 	}
 
 	return c.JSON(http.StatusOK, category)
@@ -58,39 +58,38 @@ func (h *CategoryHandler) GetCategory(c echo.Context) error {
 func (h *CategoryHandler) UpdateCategory(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid ID format",
-		})
+		log.Printf("Invalid category ID format for category")
+		return c.JSON(errors.ErrBadRequest.Code,
+			errors.ErrBadRequest.WithDetails(map[string]any{
+				"field": "id",
+				"value": c.Param("id"),
+			}).WithMap())
 	}
 
 	var input entities.Category
 
 	if err := c.Bind(&input); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid request body",
-		})
+		log.Printf("Invalid request body for category")
+		return c.JSON(errors.ErrBadRequest.Code,
+			errors.ErrBadRequest.WithError(err).WithMap())
 	}
 
 	// проверка на совпадение id в URL и id в теле запроса
 	if input.ID != 0 && input.ID != id {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "ID in URL and body mismatch",
-		})
+		return c.JSON(errors.ErrBadRequest.Code,
+			errors.ErrBadRequest.WithDetails("ID in URL and body mismatch").WithMap())
 	}
 	input.ID = id // Устанавливаем ID из URL
 
 	if err := c.Validate(input); err != nil {
-		return c.JSON(http.StatusUnprocessableEntity, echo.Map{
-			"error":   "Validation failed",
-			"details": err.Error(),
-		})
+		return c.JSON(errors.ErrValidation.Code,
+			errors.ErrValidation.WithDetails(err.Error()).WithMap())
 	}
 
 	err = h.store.UpdateCat(c.Request().Context(), &input)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to update category",
-		})
+		log.Printf("Update category failed: %v", err)
+		return c.JSON(errors.ErrDatabase.Code, errors.ErrDatabase.WithError(err).WithMap())
 	}
 	return c.JSON(http.StatusOK, input)
 }
@@ -99,25 +98,27 @@ func (h *CategoryHandler) UpdateCategory(c echo.Context) error {
 func (h *CategoryHandler) DeleteCategory(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid ID format",
-		})
+		log.Printf("Invalid ID format for category")
+		return c.JSON(errors.ErrBadRequest.Code,
+			errors.ErrBadRequest.WithDetails(map[string]any{
+				"field": "id",
+				"value": c.Param("id"),
+			}).WithMap())
 	}
 
 	deletedCategory, err := h.store.DeleteCat(c.Request().Context(), id)
 	if err != nil {
 		log.Printf("Delete failed for category %d: %v", id, err)
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to delete category",
-		})
+		return c.JSON(errors.ErrDatabase.Code, errors.ErrDatabase.WithError(err).WithMap())
 	}
 
 	if deletedCategory == nil {
-		return c.JSON(http.StatusNotFound, echo.Map{
-			"error": "Category not found",
-		})
+		return c.JSON(errors.ErrNotFound.Code,
+			errors.ErrNotFound.WithDetails(map[string]any{
+				"id": id,
+			}).WithMap())
 	}
 
-	log.Printf("Product deleted: ID=%d, Name=%s, Price=%v", deletedCategory.ID, deletedCategory.Name)
+	log.Printf("Product deleted: ID=%d, Name=%s", deletedCategory.ID, deletedCategory.Name)
 	return c.JSON(http.StatusOK, deletedCategory)
 }

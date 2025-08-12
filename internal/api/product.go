@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/Vladimir-Cha/product_accounting_service/internal/entities"
+	"github.com/Vladimir-Cha/product_accounting_service/internal/errors"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/postgres"
 	"github.com/labstack/echo/v4"
 )
@@ -22,15 +23,13 @@ func NewProductHandler(store *postgres.ProductStore) *ProductHandler {
 func (h *ProductHandler) CreateProduct(c echo.Context) error {
 	var p entities.Product
 	if err := c.Bind(&p); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid request body",
-		})
+		log.Printf("Invalid request body for product")
+		return c.JSON(errors.ErrBadRequest.Code, errors.ErrBadRequest.WithMap())
 	}
 
 	if err := h.store.Create(c.Request().Context(), &p); err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to create product",
-		})
+		log.Printf("Failed to create product")
+		return c.JSON(errors.ErrDatabase.Code, errors.ErrBadRequest.WithMap())
 	}
 	return c.JSON(http.StatusCreated, p)
 }
@@ -39,16 +38,17 @@ func (h *ProductHandler) CreateProduct(c echo.Context) error {
 func (h *ProductHandler) GetProduct(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid ID format",
-		})
+		log.Printf("Invalid ID format for product")
+		return c.JSON(errors.ErrBadRequest.Code, errors.ErrBadRequest.WithDetails(map[string]any{
+			"field": "id",
+			"value": c.Param("id"),
+		}).WithMap())
 	}
 
 	product, err := h.store.Read(c.Request().Context(), id)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, echo.Map{
-			"error": "Product not found",
-		})
+		log.Printf("Product not found: %v", err)
+		return c.JSON(errors.ErrDatabase.Code, errors.ErrDatabase.WithError(err).WithMap())
 	}
 
 	return c.JSON(http.StatusOK, product)
@@ -58,24 +58,26 @@ func (h *ProductHandler) GetProduct(c echo.Context) error {
 func (h *ProductHandler) UpdateProduct(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid ID format",
-		})
+		log.Printf("Invalid ID format for product")
+		return c.JSON(errors.ErrBadRequest.Code,
+			errors.ErrBadRequest.WithDetails(map[string]any{
+				"field": "id",
+				"value": c.Param("id"),
+			}).WithMap())
 	}
 
 	var input entities.Product
 
 	if err := c.Bind(&input); err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid request body",
-		})
+		log.Printf("Invalid request body for product")
+		return c.JSON(errors.ErrBadRequest.Code,
+			errors.ErrBadRequest.WithError(err).WithMap())
 	}
 
 	// проверка на совпадение id в URL и id в теле запроса
 	if input.ID != 0 && input.ID != id {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "ID in URL and body mismatch",
-		})
+		return c.JSON(errors.ErrBadRequest.Code,
+			errors.ErrBadRequest.WithDetails("ID in URL and body mismatch").WithMap())
 	}
 	input.ID = id // Устанавливаем ID из URL
 
@@ -88,9 +90,8 @@ func (h *ProductHandler) UpdateProduct(c echo.Context) error {
 
 	err = h.store.Update(c.Request().Context(), &input)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to update product",
-		})
+		log.Printf("Update product failed: %v", err)
+		return c.JSON(errors.ErrDatabase.Code, errors.ErrDatabase.WithError(err).WithMap())
 	}
 	return c.JSON(http.StatusOK, input)
 }
@@ -99,23 +100,25 @@ func (h *ProductHandler) UpdateProduct(c echo.Context) error {
 func (h *ProductHandler) DeleteProduct(c echo.Context) error {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, echo.Map{
-			"error": "Invalid ID format",
-		})
+		log.Printf("Invalid ID format for product")
+		return c.JSON(errors.ErrBadRequest.Code,
+			errors.ErrBadRequest.WithDetails(map[string]any{
+				"field": "id",
+				"value": c.Param("id"),
+			}).WithMap())
 	}
 
 	deletedProduct, err := h.store.Delete(c.Request().Context(), id)
 	if err != nil {
 		log.Printf("Delete failed for product %d: %v", id, err)
-		return c.JSON(http.StatusInternalServerError, echo.Map{
-			"error": "Failed to delete product",
-		})
+		return c.JSON(errors.ErrDatabase.Code, errors.ErrDatabase.WithError(err).WithMap())
 	}
 
 	if deletedProduct == nil {
-		return c.JSON(http.StatusNotFound, echo.Map{
-			"error": "Product not found",
-		})
+		return c.JSON(errors.ErrNotFound.Code,
+			errors.ErrNotFound.WithDetails(map[string]any{
+				"id": id,
+			}).WithMap())
 	}
 
 	log.Printf("Product deleted: ID=%d, Name=%s, Price=%v", deletedProduct.ID, deletedProduct.Name, deletedProduct.Price)

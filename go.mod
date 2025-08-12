@@ -1,6 +1,6 @@
 module github.com/Vladimir-Cha/product_accounting_service
 
-go 1.23.0
+go 1.24.5
 
 require (
 	github.com/go-playground/validator v9.31.0+incompatible

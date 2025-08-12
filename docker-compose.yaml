@@ -1,5 +1,19 @@
 version: '3.8'
 services:
+  app:
+    build: .
+    container_name: product_app
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=123
+      - DB_NAME=mydatabase
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:latest
     container_name: my-postgres
@@ -7,6 +21,16 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "123"
       POSTGRES_DB: mydatabase
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+
+volumes:
+  postgres_data:

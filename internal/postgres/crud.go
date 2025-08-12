@@ -80,7 +80,7 @@ func (s *ProductStore) Update(ctx context.Context, product *entities.Product) er
 
 func (s *ProductStore) Delete(ctx context.Context, id int) (*entities.Product, error) {
 	p, err := s.Read(ctx, id)
-	//p := &entities.Product{}
+
 	if err != nil {
 		return nil, err
 	}
