@@ -1,21 +1,28 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/Vladimir-Cha/product_accounting_service/internal/entities"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/errors"
-	"github.com/Vladimir-Cha/product_accounting_service/internal/postgres"
 	"github.com/labstack/echo/v4"
 )
 
-type ProductHandler struct {
-	store *postgres.ProductStore
+type ProductStore interface {
+	Create(ctx context.Context, category *entities.Product) error
+	Read(ctx context.Context, id int) (*entities.Product, error)
+	Update(ctx context.Context, category *entities.Product) error
+	Delete(ctx context.Context, id int) (*entities.Product, error)
 }
 
-func NewProductHandler(store *postgres.ProductStore) *ProductHandler {
+type ProductHandler struct {
+	store ProductStore
+}
+
+func NewProductHandler(store ProductStore) *ProductHandler {
 	return &ProductHandler{store: store}
 }
 
@@ -29,7 +36,7 @@ func (h *ProductHandler) CreateProduct(c echo.Context) error {
 
 	if err := h.store.Create(c.Request().Context(), &p); err != nil {
 		log.Printf("Failed to create product")
-		return c.JSON(errors.ErrDatabase.Code, errors.ErrBadRequest.WithMap())
+		return c.JSON(errors.ErrBadRequest.Code, errors.ErrBadRequest.WithMap())
 	}
 	return c.JSON(http.StatusCreated, p)
 }
@@ -91,7 +98,7 @@ func (h *ProductHandler) UpdateProduct(c echo.Context) error {
 	err = h.store.Update(c.Request().Context(), &input)
 	if err != nil {
 		log.Printf("Update product failed: %v", err)
-		return c.JSON(errors.ErrDatabase.Code, errors.ErrDatabase.WithError(err).WithMap())
+		return c.JSON(errors.ErrBadRequest.Code, errors.ErrBadRequest.WithError(err).WithMap())
 	}
 	return c.JSON(http.StatusOK, input)
 }

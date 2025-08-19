@@ -4,47 +4,54 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
+	"time"
 
 	"github.com/Vladimir-Cha/product_accounting_service/internal/api"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/config"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/database"
-	"github.com/Vladimir-Cha/product_accounting_service/internal/postgres"
+	"github.com/Vladimir-Cha/product_accounting_service/internal/logger"
+	"github.com/Vladimir-Cha/product_accounting_service/internal/storage"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/validator"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
 
-	repo, err := database.New(context.Background(), config.DBConfig{
+	// инициализация подключения к БД
+	dbConfig := config.DBConfig{
 		DBUrl:      cfg.DBUrl,
 		DBMaxConns: cfg.DBMaxConns,
 		DBMinConns: cfg.DBMinConns,
 		DBConnLife: cfg.DBConnLife,
-	})
-	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer repo.Close()
 
-	if err := repo.Ping(context.Background()); err != nil {
-		log.Fatalf("Failed to connect database: %v", err)
+	pool, err := database.New(context.Background(), dbConfig)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	defer pool.Close()
 
 	// опциональные миграции
 	runMigrations := true
 	if runMigrations {
-		if err := postgres.GooseMigrationsWithPool(context.Background(), repo.Pool()); err != nil {
+		if err := storage.GooseMigrationsWithPool(context.Background(), pool); err != nil {
 			log.Fatalf("Migration failed: %v", err)
 		}
 		log.Println("Migrations applied successfully")
 	}
 
-	productStore := postgres.NewProductStore(repo.Pool())
+	appLogger := logger.NewConsoleLogger()
+	productStore := storage.NewProductStore(pool, appLogger)
 	productHandler := api.NewProductHandler(productStore)
-	categoryStore := postgres.NewCategoryStore(repo.Pool())
+	categoryStore := storage.NewCategoryStore(pool, appLogger)
 	categoryHandler := api.NewCategoryHandler(categoryStore)
 
 	e := echo.New()
@@ -66,4 +73,14 @@ func main() {
 	if err := e.Start(addr); err != http.ErrServerClosed {
 		log.Fatalf("Starting server error: %v", err)
 	}
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := e.Shutdown(ctx); err != nil {
+		log.Fatal("Server shutdown error:", err)
+	}
+	log.Println("Server shutdown completed gracefully")
 }

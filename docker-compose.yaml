@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   app:
     build: .
@@ -7,19 +6,21 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=postgres
-      - DB_PASSWORD=123
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=mydatabase
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    ports:
+      - "8080:8080"
 
   postgres:
     image: postgres:latest
     container_name: my-postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: "123"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: mydatabase
     volumes:
       - postgres_data:/var/lib/postgresql/data

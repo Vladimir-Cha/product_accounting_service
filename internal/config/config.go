@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -17,18 +18,40 @@ type DBConfig struct {
 	DBConnLife time.Duration
 }
 
-func Load() *DBConfig {
+func Load() (*DBConfig, error) {
 	if err := godotenv.Load(); err != nil {
 		log.Printf("No .env file found: %v", err)
 	}
 
-	return &DBConfig{
-		DBUrl:      getEnv("DATABASE_URL", ""),
+	// вспомогательные переменные для формирования url
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+
+	if dbUser == "" || dbPassword == "" || dbHost == "" || dbPort == "" || dbName == "" {
+		return nil, fmt.Errorf("missing parametrs: DB_USER, DB_PASSWORD, DB_HOST, DB_PORT or DB_NAME")
+	}
+
+	// формируем url из переменных окружения
+	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		dbUser,
+		dbPassword,
+		dbHost,
+		dbPort,
+		dbName,
+	)
+
+	cfg := &DBConfig{
+		DBUrl:      dbURL,
 		ServerPort: getEnvAsInt("SERVER_PORT", 8080),
 		DBMaxConns: getEnvAsInt32("DB_MAX_CONNS", 10),
 		DBMinConns: getEnvAsInt32("DB_MIN_CONNS", 2),
 		DBConnLife: getEnvAsDuration("DB_CONN_LIFE", time.Hour),
 	}
+
+	return cfg, nil
 }
 
 // Вспомогательные функции для парсинга

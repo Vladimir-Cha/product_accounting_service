@@ -40,7 +40,7 @@ func (e *Error) WithDetails(details any) *Error {
 		Code:    e.Code,
 		Message: e.Message,
 		Details: details,
-		Err:     e.Err,
+		//Err:     e.Err,
 	}
 }
 
@@ -49,7 +49,7 @@ func (e *Error) WithError(err error) *Error {
 	return &Error{
 		Code:    e.Code,
 		Message: e.Message,
-		Err:     err,
+		//Err:     err,
 	}
 }
 

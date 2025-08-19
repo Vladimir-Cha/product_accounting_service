@@ -1,21 +1,28 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/Vladimir-Cha/product_accounting_service/internal/entities"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/errors"
-	"github.com/Vladimir-Cha/product_accounting_service/internal/postgres"
 	"github.com/labstack/echo/v4"
 )
 
-type CategoryHandler struct {
-	store *postgres.CategoryStore
+type CategoryStore interface {
+	CreateCat(ctx context.Context, category *entities.Category) error
+	ReadCat(ctx context.Context, id int) (*entities.Category, error)
+	UpdateCat(ctx context.Context, category *entities.Category) error
+	DeleteCat(ctx context.Context, id int) (*entities.Category, error)
 }
 
-func NewCategoryHandler(store *postgres.CategoryStore) *CategoryHandler {
+type CategoryHandler struct {
+	store CategoryStore
+}
+
+func NewCategoryHandler(store CategoryStore) *CategoryHandler {
 	return &CategoryHandler{store: store}
 }
 
@@ -29,7 +36,7 @@ func (h *CategoryHandler) CreateCategory(c echo.Context) error {
 
 	if err := h.store.CreateCat(c.Request().Context(), &p); err != nil {
 		log.Printf("Failed to create category")
-		return c.JSON(errors.ErrDatabase.Code, errors.ErrBadRequest.WithMap())
+		return c.JSON(errors.ErrBadRequest.Code, errors.ErrBadRequest.WithMap())
 	}
 	return c.JSON(http.StatusCreated, p)
 }
@@ -89,7 +96,7 @@ func (h *CategoryHandler) UpdateCategory(c echo.Context) error {
 	err = h.store.UpdateCat(c.Request().Context(), &input)
 	if err != nil {
 		log.Printf("Update category failed: %v", err)
-		return c.JSON(errors.ErrDatabase.Code, errors.ErrDatabase.WithError(err).WithMap())
+		return c.JSON(errors.ErrBadRequest.Code, errors.ErrBadRequest.WithError(err).WithMap())
 	}
 	return c.JSON(http.StatusOK, input)
 }
