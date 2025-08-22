@@ -11,7 +11,6 @@ import (
 
 	"github.com/Vladimir-Cha/product_accounting_service/internal/api"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/config"
-	"github.com/Vladimir-Cha/product_accounting_service/internal/database"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/logger"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/storage"
 	"github.com/Vladimir-Cha/product_accounting_service/internal/validator"
@@ -20,29 +19,23 @@ import (
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Configuration error: %v", err)
 	}
 
-	// инициализация подключения к БД
-	dbConfig := config.DBConfig{
-		DBUrl:      cfg.DBUrl,
-		DBMaxConns: cfg.DBMaxConns,
-		DBMinConns: cfg.DBMinConns,
-		DBConnLife: cfg.DBConnLife,
-	}
-
-	pool, err := database.New(context.Background(), dbConfig)
+	pool, err := storage.InitNew(ctx, *cfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer pool.Close()
 
 	// опциональные миграции
-	runMigrations := true
-	if runMigrations {
-		if err := storage.GooseMigrationsWithPool(context.Background(), pool); err != nil {
+	if cfg.RunMigrations {
+		if err := storage.GooseMigrationsWithPool(ctx, pool); err != nil {
 			log.Fatalf("Migration failed: %v", err)
 		}
 		log.Println("Migrations applied successfully")
@@ -69,17 +62,23 @@ func main() {
 	e.DELETE("/categories/:id", categoryHandler.DeleteCategory)
 
 	// запуск сервера
-	addr := ":" + strconv.Itoa(cfg.ServerPort)
-	if err := e.Start(addr); err != http.ErrServerClosed {
-		log.Fatalf("Starting server error: %v", err)
-	}
+	go func() {
+		addr := ":" + strconv.Itoa(cfg.Server.Port)
+		log.Printf("Server starting on %s", addr)
+		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Starting server error: %v", err)
+		}
+	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := e.Shutdown(ctx); err != nil {
+	log.Println("Shutting down server...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := e.Shutdown(shutdownCtx); err != nil {
 		log.Fatal("Server shutdown error:", err)
 	}
 	log.Println("Server shutdown completed gracefully")

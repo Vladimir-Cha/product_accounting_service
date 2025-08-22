@@ -10,15 +10,24 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type ServerConfig struct {
+	Port int
+}
+
 type DBConfig struct {
 	DBUrl      string
-	ServerPort int
 	DBMaxConns int32
 	DBMinConns int32
 	DBConnLife time.Duration
 }
 
-func Load() (*DBConfig, error) {
+type AppConfig struct {
+	Server        *ServerConfig
+	Database      *DBConfig
+	RunMigrations bool
+}
+
+func Load() (*AppConfig, error) {
 	if err := godotenv.Load(); err != nil {
 		log.Printf("No .env file found: %v", err)
 	}
@@ -43,12 +52,21 @@ func Load() (*DBConfig, error) {
 		dbName,
 	)
 
-	cfg := &DBConfig{
+	DBcfg := &DBConfig{
 		DBUrl:      dbURL,
-		ServerPort: getEnvAsInt("SERVER_PORT", 8080),
 		DBMaxConns: getEnvAsInt32("DB_MAX_CONNS", 10),
 		DBMinConns: getEnvAsInt32("DB_MIN_CONNS", 2),
 		DBConnLife: getEnvAsDuration("DB_CONN_LIFE", time.Hour),
+	}
+
+	ServCfg := &ServerConfig{
+		Port: getEnvAsInt("SERVER_PORT", 8080),
+	}
+
+	cfg := &AppConfig{
+		Server:        ServCfg,
+		Database:      DBcfg,
+		RunMigrations: getEnvAsBool("RUN_MIGRATIONS", true),
 	}
 
 	return cfg, nil
@@ -78,6 +96,14 @@ func getEnvAsInt32(key string, defaultValue int32) int32 {
 func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 	valueStr := getEnv(key, "")
 	if value, err := time.ParseDuration(valueStr); err == nil {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	valueStr := getEnv(key, "")
+	if value, err := strconv.ParseBool(valueStr); err == nil {
 		return value
 	}
 	return defaultValue
