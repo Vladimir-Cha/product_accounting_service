@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+//go:generate mockgen -source=product.go -destination=../mocks/product_mock.go -package=mocks ProductStore
 type ProductStore interface {
 	Create(ctx context.Context, category *entities.Product) error
 	Read(ctx context.Context, id int) (*entities.Product, error)

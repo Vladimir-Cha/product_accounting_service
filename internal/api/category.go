@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+//go:generate mockgen -source=category.go -destination=../mocks/category_mock.go -package=mocks CategoryStore
 type CategoryStore interface {
 	CreateCat(ctx context.Context, category *entities.Category) error
 	ReadCat(ctx context.Context, id int) (*entities.Category, error)
