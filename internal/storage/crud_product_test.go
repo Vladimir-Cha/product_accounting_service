@@ -10,6 +10,7 @@ import (
 	"github.com/Vladimir-Cha/product_accounting_service/internal/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProductStore_Create(t *testing.T) {
@@ -53,7 +54,7 @@ func TestProductStore_Create(t *testing.T) {
 
 		err := mockStore.Create(ctx, errorProduct)
 		assert.Error(t, err)
-		assert.Equal(t, "database error", err.Error())
+		require.Equal(t, "database error", err.Error())
 	})
 }
 
@@ -100,7 +101,7 @@ func TestProductStore_Read(t *testing.T) {
 		result, err := mockStore.Read(ctx, 500)
 		assert.Error(t, err)
 		assert.Nil(t, result)
-		assert.Equal(t, "database connection error", err.Error())
+		require.Equal(t, "database connection error", err.Error())
 	})
 }
 
@@ -141,7 +142,7 @@ func TestProductStore_Update(t *testing.T) {
 
 		err := mockStore.Update(ctx, nonExistentProduct)
 		assert.Error(t, err)
-		assert.Equal(t, "product not found", err.Error())
+		require.Equal(t, "product not found", err.Error())
 	})
 
 	t.Run("database error on update", func(t *testing.T) {
@@ -156,7 +157,7 @@ func TestProductStore_Update(t *testing.T) {
 
 		err := mockStore.Update(ctx, product)
 		assert.Error(t, err)
-		assert.Equal(t, "update failed", err.Error())
+		require.Equal(t, "update failed", err.Error())
 	})
 }
 
@@ -203,6 +204,6 @@ func TestProductStore_Delete(t *testing.T) {
 		result, err := mockStore.Delete(ctx, 500)
 		assert.Error(t, err)
 		assert.Nil(t, result)
-		assert.Equal(t, "delete failed", err.Error())
+		require.Equal(t, "delete failed", err.Error())
 	})
 }

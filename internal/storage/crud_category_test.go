@@ -10,6 +10,7 @@ import (
 	"github.com/Vladimir-Cha/product_accounting_service/internal/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCategoryStore_CreateCat(t *testing.T) {
@@ -52,7 +53,7 @@ func TestCategoryStore_CreateCat(t *testing.T) {
 
 		err := mockStore.CreateCat(ctx, errorCategory)
 		assert.Error(t, err)
-		assert.Equal(t, "database error", err.Error())
+		require.Equal(t, "database error", err.Error())
 	})
 }
 
@@ -98,7 +99,7 @@ func TestCategoryStore_ReadCat(t *testing.T) {
 		result, err := mockStore.ReadCat(ctx, 500)
 		assert.Error(t, err)
 		assert.Nil(t, result)
-		assert.Equal(t, "database connection error", err.Error())
+		require.Equal(t, "database connection error", err.Error())
 	})
 }
 
@@ -138,7 +139,7 @@ func TestCategoryStore_UpdateCat(t *testing.T) {
 
 		err := mockStore.UpdateCat(ctx, nonExistentCategory)
 		assert.Error(t, err)
-		assert.Equal(t, "category not found", err.Error())
+		require.Equal(t, "category not found", err.Error())
 	})
 
 	t.Run("database error on update", func(t *testing.T) {
@@ -153,7 +154,7 @@ func TestCategoryStore_UpdateCat(t *testing.T) {
 
 		err := mockStore.UpdateCat(ctx, category)
 		assert.Error(t, err)
-		assert.Equal(t, "update failed", err.Error())
+		require.Equal(t, "update failed", err.Error())
 	})
 }
 
@@ -199,6 +200,6 @@ func TestCategoryStore_DeleteCat(t *testing.T) {
 		result, err := mockStore.DeleteCat(ctx, 500)
 		assert.Error(t, err)
 		assert.Nil(t, result)
-		assert.Equal(t, "delete failed", err.Error())
+		require.Equal(t, "delete failed", err.Error())
 	})
 }
